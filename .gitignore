@@ -1,0 +1,13 @@
+# Environment & cache
+.venv/
+__pycache__/
+*.pyc
+
+# Local indexes
+billing_index/
+tech_index/
+general_index/
+chroma_index/
+
+# Sensitive data
+.env
