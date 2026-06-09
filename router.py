@@ -1,12 +1,12 @@
 """Router agent — classifies user queries into department categories.
 
-Uses Groq LLM to determine whether a query should be handled by
+Uses OpenRouter LLM to determine whether a query should be handled by
 the billing, technical, or general support agent.
 """
 
 from __future__ import annotations
 
-from groq import Groq
+from openai import OpenAI
 
 from config import settings
 from logger import get_logger
@@ -26,8 +26,11 @@ ROUTER_SYSTEM_PROMPT = (
 )
 
 
-def _get_client() -> Groq:
-    return Groq(api_key=settings.groq_api_key)
+def _get_client() -> OpenAI:
+    return OpenAI(
+        api_key=settings.openrouter_api_key,
+        base_url=settings.openrouter_base_url,
+    )
 
 
 def classify_query(query: str) -> str:

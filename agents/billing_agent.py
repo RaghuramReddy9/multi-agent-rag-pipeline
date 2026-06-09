@@ -1,11 +1,11 @@
 """Billing agent — handles billing, payment, refund, and subscription queries.
 
-Uses Groq LLM + Chroma RAG over billing_faq.txt.
+Uses OpenRouter LLM + Chroma RAG over billing_faq.txt.
 """
 
 from __future__ import annotations
 
-from groq import Groq
+from openai import OpenAI
 from langchain_chroma import Chroma
 
 from config import settings
@@ -15,8 +15,11 @@ from utils.vector_store import build_or_load_vectorstore
 logger = get_logger(__name__)
 
 
-def _get_client() -> Groq:
-    return Groq(api_key=settings.groq_api_key)
+def _get_client() -> OpenAI:
+    return OpenAI(
+        api_key=settings.openrouter_api_key,
+        base_url=settings.openrouter_base_url,
+    )
 
 
 def answer_billing_query(query: str, chat_history: str | None = None) -> str:

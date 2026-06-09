@@ -14,11 +14,15 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings loaded from environment / .env."""
 
-    # --- LLM ---
-    groq_api_key: str = Field(..., description="Groq API key")
+    # --- LLM (OpenRouter) ---
+    openrouter_api_key: str = Field(..., description="OpenRouter API key")
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1",
+        description="OpenRouter API base URL",
+    )
     llm_model: str = Field(
-        default="llama-3.1-8b-instant",
-        description="Groq model name for all agents",
+        default="openrouter/auto",
+        description="OpenRouter model name (e.g., openrouter/auto, openrouter/anthropic/claude-sonnet-4)",
     )
     llm_temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     llm_max_tokens: int = Field(default=512, ge=1)

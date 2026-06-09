@@ -4,7 +4,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![LangChain](https://img.shields.io/badge/LangChain-0.3+-green.svg)](https://www.langchain.com)
-[![Groq](https://img.shields.io/badge/LLM-Groq%20API-orange.svg)](https://console.groq.com)
+[![OpenRouter](https://img.shields.io/badge/LLM-OpenRouter-blue.svg)](https://openrouter.ai)
 [![Streamlit](https://img.shields.io/badge/UI-Streamlit-red.svg)](https://streamlit.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -19,7 +19,7 @@ Multi-Agent RAG Pipeline is an AI customer support system where **specialized ag
 - **Conversation memory** maintains context across turns within a session
 - **Structured logging** and **error handling** throughout
 
-Built with **Groq** (LLaMA 3.1 8B) for low-latency inference, **LangChain 0.3+** for orchestration, **ChromaDB** for vector search, and **Streamlit** for the UI.
+Built with **OpenRouter** for flexible LLM access (supports Claude, GPT, LLaMA, and 100+ models), **LangChain 0.3+** for orchestration, **ChromaDB** for vector search, and **Streamlit** for the UI.
 
 ---
 
@@ -74,7 +74,7 @@ Built with **Groq** (LLaMA 3.1 8B) for low-latency inference, **LangChain 0.3+**
 
 | Component        | Technology                                          |
 | ---------------- | --------------------------------------------------- |
-| **LLM Provider** | [Groq API](https://console.groq.com) (LLaMA 3.1 8B) |
+| **LLM Provider** | [OpenRouter](https://openrouter.ai) (100+ models: Claude, GPT, LLaMA, etc.) |
 | **Framework**    | [LangChain 0.3+](https://www.langchain.com)          |
 | **Vector Store** | [ChromaDB](https://www.trychroma.com)                |
 | **Embeddings**   | `sentence-transformers/all-MiniLM-L6-v2`             |
@@ -143,7 +143,7 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Edit .env and add your Groq API key
+# Edit .env and add your OpenRouter API key
 ```
 
 ### 5. Run the app
@@ -166,8 +166,9 @@ All settings are managed in `config.py` via Pydantic Settings. Override any valu
 
 | Variable              | Default                          | Description                    |
 | --------------------- | -------------------------------- | ------------------------------ |
-| `GROQ_API_KEY`        | *(required)*                     | Groq API key                   |
-| `LLM_MODEL`           | `llama-3.1-8b-instant`           | Groq model name                |
+| `OPENROUTER_API_KEY`  | *(required)*                     | OpenRouter API key                 |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1`   | OpenRouter API base URL            |
+| `LLM_MODEL`           | `openrouter/auto`                | OpenRouter model (e.g., `openrouter/anthropic/claude-sonnet-4`) |
 | `LLM_TEMPERATURE`     | `0.2`                            | LLM temperature                |
 | `LLM_MAX_TOKENS`      | `512`                            | Max tokens per response        |
 | `EMBEDDING_MODEL`     | `sentence-transformers/all-MiniLM-L6-v2` | HuggingFace embedding model |
@@ -202,7 +203,7 @@ This repo was upgraded from a demo to production-ready:
 6. **Shared vector store utility** — single `build_or_load_vectorstore()` function with caching
 7. **Tests** — pytest unit tests for router classification and agent error handling
 8. **`.env.example`** — documents all required and optional environment variables
-9. **Updated `.gitignore`** — covers `.env`, caches, IDE files, OS files
+11. **LLM provider: Groq → OpenRouter** — all agents and router now use the OpenAI-compatible client pointed at OpenRouter. Supports 100+ models (Claude, GPT, LLaMA, etc.) with a single API key.
 10. **Updated README** — matches actual project structure and current architecture
 
 ---
