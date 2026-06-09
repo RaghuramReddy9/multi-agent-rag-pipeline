@@ -12,7 +12,6 @@ langchain-text-splitters>=0.3.0
 
 # LangGraph orchestration
 langgraph>=0.4.0
-langchain-deepagents>=0.1.0
 
 # Vector store
 chromadb>=0.5.0
