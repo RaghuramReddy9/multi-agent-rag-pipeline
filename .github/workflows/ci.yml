@@ -42,9 +42,8 @@ jobs:
 
       - name: Run tests
         env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || 'sk-test-key' }}
+          OPENROUTER_API_KEY: sk-test-key-for-ci
         run: |
-          # Mock tests don't need real API key
           pytest tests/ -v --tb=short
 
   docker:
