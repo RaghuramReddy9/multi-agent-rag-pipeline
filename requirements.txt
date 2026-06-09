@@ -1,11 +1,28 @@
-langchain-huggingface
-groq
-langchain
-langchain-core
-langchain-community
-langchain-text-splitters
-chromadb
-sentence-transformers
-streamlit
-python-dotenv
+# Core
+groq>=0.18.0
+python-dotenv>=1.0.0
 
+# LangChain ecosystem (current versions)
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+langchain-huggingface>=0.1.0
+langchain-chroma>=0.1.0
+langchain-text-splitters>=0.3.0
+
+# Vector store
+chromadb>=0.5.0
+
+# Embeddings
+sentence-transformers>=3.0.0
+
+# Frontend
+streamlit>=1.38.0
+
+# Config
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0

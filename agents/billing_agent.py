@@ -1,49 +1,72 @@
-from utils.groq_client import get_groq_client
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import TextLoader
-import os
+"""Billing agent — handles billing, payment, refund, and subscription queries.
 
-def build_billing_vectorstore(index_path="billing_index", data_path="data/billing_faq.txt"):
-    """Creates or loads Chroma index for billing documents."""
-    os.makedirs(index_path, exist_ok=True)
-    loader = TextLoader(data_path)
-    docs = loader.load()
-    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    chunks = splitter.split_documents(docs)
+Uses Groq LLM + Chroma RAG over billing_faq.txt.
+"""
 
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    db = Chroma.from_documents(chunks, embeddings, persist_directory=index_path)
-    return db
+from __future__ import annotations
 
-def answer_billing_query(query: str):
-    """Generate billing-related answer using Groq and document context."""
-    client = get_groq_client()
-    db = build_billing_vectorstore()
-    retriever = db.as_retriever(search_kwargs={"k":3})
+from groq import Groq
+from langchain_chroma import Chroma
 
-    # Retrieve context from billing docs
-    results = retriever.invoke(query)
-    context = "\n".join([doc.page_content for doc in results])
+from config import settings
+from logger import get_logger
+from utils.vector_store import build_or_load_vectorstore
 
-    # Generate answer
-    system_prompt = (
-        "You are a helpful customer support assistant specializing in billing and payment questions. "
-        "Use the following company policy information to answer accurately and clearly."
-    )
+logger = get_logger(__name__)
 
-    completion = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
-        ],        
-        temperature=0.2,
-        max_tokens=150,
-    )
 
-    answer = completion.choices[0].message.content.strip()
-    return answer
+def _get_client() -> Groq:
+    return Groq(api_key=settings.groq_api_key)
 
-    
+
+def answer_billing_query(query: str, chat_history: str | None = None) -> str:
+    """Answer a billing-related query using RAG context from billing docs.
+
+    Args:
+        query: The user's question.
+        chat_history: Optional formatted conversation history for context.
+
+    Returns:
+        The agent's response string.
+    """
+    try:
+        logger.info("Billing agent processing query: %.80s...", query)
+        client = _get_client()
+        db: Chroma = build_or_load_vectorstore(
+            index_path=settings.billing_index_path,
+            data_path=settings.billing_data_path,
+        )
+        retriever = db.as_retriever(search_kwargs={"k": settings.retrieval_k})
+        results = retriever.invoke(query)
+        context = "\n".join(doc.page_content for doc in results)
+
+        system_prompt = (
+            "You are a helpful customer support assistant specializing in "
+            "billing and payment questions. Use the following company policy "
+            "information to answer accurately and clearly. If the information "
+            "is not in the context, say you don't have that data."
+        )
+
+        user_content = f"Context:\n{context}\n\nQuestion: {query}"
+        if chat_history:
+            user_content = f"Previous conversation:\n{chat_history}\n\n{user_content}"
+
+        completion = client.chat.completions.create(
+            model=settings.llm_model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            temperature=settings.llm_temperature,
+            max_tokens=settings.llm_max_tokens,
+        )
+        answer = completion.choices[0].message.content.strip()
+        logger.info("Billing agent response: %.80s...", answer)
+        return answer
+
+    except Exception as exc:
+        logger.error("Billing agent error: %s", exc, exc_info=True)
+        return (
+            "I'm sorry, I encountered an error processing your billing query. "
+            "Please try again or contact support directly."
+        )
