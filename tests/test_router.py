@@ -1,30 +1,27 @@
 """Unit tests for the router agent.
 
 Tests classification logic without calling the LLM API.
+Uses lazy imports to avoid triggering config loading at module level.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from router import classify_query, ROUTER_SYSTEM_PROMPT, DEPARTMENTS
-
 
 class TestRouterConstants:
     def test_departments_tuple(self):
+        from router import DEPARTMENTS
         assert DEPARTMENTS == ("billing", "technical", "general")
 
     def test_system_prompt_mentions_all_departments(self):
-        for dept in DEPARTMENTS:
+        from router import ROUTER_SYSTEM_PROMPT
+        for dept in ("billing", "technical", "general"):
             assert dept in ROUTER_SYSTEM_PROMPT.lower()
 
 
 class TestClassifyQuery:
-    """Test router classification with mocked LLM responses.
-
-    In a real setup you'd use unittest.mock to patch the Groq client.
-    These tests verify the function signature and fallback behavior.
-    """
+    """Test router classification with mocked LLM responses."""
 
     def test_fallback_on_error(self, monkeypatch):
         """If the LLM call raises, router should return 'general'."""
@@ -39,6 +36,7 @@ class TestClassifyQuery:
             })()
         })())
 
+        from router import classify_query
         result = classify_query("test query")
         assert result == "general"
 
@@ -56,6 +54,7 @@ class TestClassifyQuery:
             })()
         })())
 
+        from router import classify_query
         result = classify_query("I want a refund")
         assert result == "billing"
 
@@ -73,6 +72,7 @@ class TestClassifyQuery:
             })()
         })())
 
+        from router import classify_query
         result = classify_query("My app crashed")
         assert result == "technical"
 
@@ -90,5 +90,6 @@ class TestClassifyQuery:
             })()
         })())
 
+        from router import classify_query
         result = classify_query("hello")
         assert result == "general"

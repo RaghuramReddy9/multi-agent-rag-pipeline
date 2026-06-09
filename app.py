@@ -1,7 +1,9 @@
 """Streamlit app — Customer Support Multi-Agent Assistant.
 
-Routes user queries to specialized agents (Billing, Technical, General)
-using an LLM-powered router. Supports conversation memory within session.
+Uses LangGraph for orchestration:
+  Router classifies → conditional edge → department agent → response
+
+Supports conversation memory via LangGraph checkpointer.
 """
 
 from __future__ import annotations
@@ -9,11 +11,9 @@ from __future__ import annotations
 import streamlit as st
 
 from config import settings
-from router import classify_query
-from agents.billing_agent import answer_billing_query
-from agents.tech_agent import answer_tech_query
-from agents.general_agent import answer_general_query
+from langchain_core.messages import AIMessage, HumanMessage
 from logger import get_logger
+from orchestrator import get_graph
 
 logger = get_logger(__name__)
 
@@ -30,53 +30,57 @@ st.markdown(
 )
 
 # ── Session state ─────────────────────────────────────────────────────────────
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+if "thread_id" not in st.session_state:
+    import uuid
+    st.session_state.thread_id = str(uuid.uuid4())
 
-if "chat_history_str" not in st.session_state:
-    st.session_state.chat_history_str = ""
+# Build the graph with per-session thread ID for memory
+graph = get_graph()  # in-memory checkpointer; swap to SQLite path for persistence
+thread_id = st.session_state.thread_id
 
-# ── Display previous messages ────────────────────────────────────────────────
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# ── Display previous messages (from LangGraph state) ─────────────────────────
+# We reconstruct from the graph state on each rerun
+try:
+    state = graph.get_state(config={"configurable": {"thread_id": thread_id}})
+    existing_messages = state.values.get("messages", []) if state.values else []
+except Exception:
+    existing_messages = []
+
+for msg in existing_messages:
+    role = "user" if isinstance(msg, HumanMessage) else "assistant"
+    with st.chat_message(role):
+        st.markdown(msg.content)
 
 # ── User input ────────────────────────────────────────────────────────────────
 user_query = st.chat_input("Type your message here...")
 
 if user_query:
-    # Show user message
-    st.session_state.messages.append({"role": "user", "content": user_query})
+    # Show user message immediately
     with st.chat_message("user"):
         st.markdown(user_query)
 
-    # Route
-    with st.spinner("Routing your question..."):
-        department = classify_query(user_query)
+    # Run the graph
+    with st.spinner("Processing..."):
+        try:
+            result = graph.invoke(
+                {"messages": [HumanMessage(content=user_query)]},
+                config={"configurable": {"thread_id": thread_id}},
+            )
+            # Get the last AI message
+            ai_messages = [
+                m for m in result.get("messages", []) if isinstance(m, AIMessage)
+            ]
+            if ai_messages:
+                answer = ai_messages[-1].content
+            else:
+                answer = "No response generated."
 
-    # Answer with conversation memory
-    with st.spinner(f"{department.capitalize()} agent is preparing a response..."):
-        history = st.session_state.chat_history_str
-        if department == "billing":
-            answer = answer_billing_query(user_query, chat_history=history)
-        elif department == "technical":
-            answer = answer_tech_query(user_query, chat_history=history)
-        else:
-            answer = answer_general_query(user_query, chat_history=history)
+            with st.chat_message("assistant"):
+                st.markdown(answer)
 
-    # Display answer
-    st.session_state.messages.append({"role": "assistant", "content": answer})
-    with st.chat_message("assistant"):
-        st.markdown(answer)
+            dept = result.get("department", "unknown")
+            logger.info("Turn complete | thread=%s | dept=%s", thread_id[:8], dept)
 
-    # Update conversation memory (last 6 turns = 12 messages)
-    recent = st.session_state.messages[-12:]
-    history_lines = [
-        f"{m['role'].capitalize()}: {m['content']}" for m in recent
-    ]
-    st.session_state.chat_history_str = "\n".join(history_lines)
-
-    logger.info(
-        "Turn complete | dept=%s | query=%.50s | answer=%.50s",
-        department, user_query, answer,
-    )
+        except Exception as exc:
+            logger.error("App error: %s", exc, exc_info=True)
+            st.error(f"An error occurred: {exc}")
