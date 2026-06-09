@@ -26,33 +26,42 @@ Built with **OpenRouter** for flexible LLM access (supports Claude, GPT, LLaMA, 
 ## Architecture
 
 ```
-┌─────────────┐
-│  User Query  │
-└──────┬──────┘
-       │
-       ▼
-┌──────────────────┐
-│  Router Agent     │  Groq LLM classifies query
-│  (Groq LLaMA 3.1)│  into billing / technical / general
-└──────┬───────────┘
-       │
-       ├──────────────┬──────────────┐
-       ▼              ▼              ▼
-┌────────────┐ ┌────────────┐ ┌────────────┐
-│  Billing   │ │  Technical │ │  General   │
-│  Agent     │ │  Agent     │ │  Agent     │
-│  RAG over  │ │  RAG over  │ │  RAG over  │
-│  billing   │ │  tech FAQ  │ │  general   │
-│  FAQ       │ │            │ │  FAQ       │
-└─────┬──────┘ └─────┬──────┘ └─────┬──────┘
-      │              │              │
-      └──────────────┼──────────────┘
-                     ▼
-            ┌────────────────┐
-            │  Streamlit UI  │
-            │  with session  │
-            │  memory        │
-            └────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                     User Query                               │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  LangGraph Orchestrator                                      │
+│  ┌────────────┐    ┌──────────────────────────────────────┐  │
+│  │  Router     │───▶│  Conditional Edge                    │  │
+│  │  (OpenRouter)│   │  billing / technical / general       │  │
+│  └────────────┘    └──────────┬───────────────────────────┘  │
+│                               │                              │
+│         ┌─────────────────────┼─────────────────────┐        │
+│         ▼                     ▼                     ▼        │
+│  ┌────────────┐        ┌────────────┐        ┌────────────┐  │
+│  │  Billing   │        │  Technical │        │  General   │  │
+│  │  Agent     │        │  Agent     │        │  Agent     │  │
+│  │  RAG over  │        │  RAG over  │        │  RAG over  │  │
+│  │  billing   │        │  tech FAQ  │        │  general   │  │
+│  │  FAQ       │        │            │        │  FAQ       │  │
+│  └─────┬──────┘        └─────┬──────┘        └─────┬──────┘  │
+│        └─────────────────────┼─────────────────────┘        │
+│                              ▼                               │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  Checkpointer (SQLite / InMemory)                      │  │
+│  │  Persistent conversation memory across sessions        │  │
+│  └────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
+                           │
+              ┌────────────┴────────────┐
+              ▼                         ▼
+     ┌──────────────┐          ┌──────────────┐
+     │  Streamlit   │          │  FastAPI     │
+     │  UI          │          │  REST API    │
+     │  :8501       │          │  :8000       │
+     └──────────────┘          └──────────────┘
 ```
 
 ---
@@ -90,14 +99,24 @@ Built with **OpenRouter** for flexible LLM access (supports Claude, GPT, LLaMA, 
 ```
 multi-agent-rag-pipeline/
 ├── app.py                    # Streamlit entry point
+├── api.py                    # FastAPI REST API
 ├── router.py                 # Query classification agent
 ├── config.py                 # Pydantic settings (loads from .env)
 ├── logger.py                 # Structured logging setup
+├── orchestrator.py           # LangGraph state graph
+├── tools.py                  # Tool wrappers for cross-department escalation
 ├── requirements.txt          # Python dependencies
 ├── .env.example              # Template for environment variables
 ├── .gitignore
+├── .dockerignore
 ├── LICENSE
+├── Dockerfile                # Streamlit container
+├── Dockerfile.api            # API container
+├── docker-compose.yml        # Multi-service orchestration
 ├── README.md
+├── .github/
+│   └── workflows/
+│       └── ci.yml            # GitHub Actions CI/CD
 ├── agents/
 │   ├── billing_agent.py      # Billing RAG agent
 │   ├── tech_agent.py         # Technical support RAG agent
@@ -191,32 +210,40 @@ All settings are managed in `config.py` via Pydantic Settings. Override any valu
 
 ---
 
-## What Changed from v1 (Production Upgrade)
+## What Changed — v2.0 (Full Production Upgrade)
 
-This repo was upgraded from a demo to production-ready:
+### Phase 1 — Foundation
+1. **LangChain imports fixed** — uses current `langchain-huggingface`, `langchain-chroma`, `langchain-core`
+2. **Centralized config** — Pydantic Settings replaces hardcoded values
+3. **Error handling** — every agent has try/catch with user-friendly fallbacks
+4. **Conversation memory** — session-level chat history (last 6 turns)
+5. **Structured logging** — timestamped, level-based logging
+6. **Shared vector store** — single `utils/vector_store.py` with caching
+7. **Tests** — pytest unit tests for router and agents
+8. **`.env.example`** — documents all env vars
+9. **LICENSE** — MIT
+10. **Updated `.gitignore`** — covers `.env`, caches, IDE files
 
-1. **LangChain imports fixed** — uses current `langchain-huggingface`, `langchain-chroma`, `langchain-core` instead of deprecated `langchain_community.*` paths
-2. **Centralized config** — Pydantic Settings replaces hardcoded values scattered across files
-3. **Error handling** — every agent has try/catch with user-friendly fallback messages
-4. **Conversation memory** — session-level chat history passed to agents
-5. **Structured logging** — timestamped, level-based logging throughout
-6. **Shared vector store utility** — single `build_or_load_vectorstore()` function with caching
-7. **Tests** — pytest unit tests for router classification and agent error handling
-8. **`.env.example`** — documents all required and optional environment variables
-11. **LLM provider: Groq → OpenRouter** — all agents and router now use the OpenAI-compatible client pointed at OpenRouter. Supports 100+ models (Claude, GPT, LLaMA, etc.) with a single API key.
-10. **Updated README** — matches actual project structure and current architecture
-
+### Phase 2 — Orchestration & API
+11. **LLM provider: Groq → OpenRouter** — supports 100+ models with one key
+12. **LangGraph orchestration** — proper state graph with typed state, conditional routing, checkpointer for persistent memory
+13. **FastAPI REST API** — `/health`, `/chat`, `/history/{thread}`, streaming support
+14. **Docker** — `Dockerfile` (Streamlit), `Dockerfile.api`, `docker-compose.yml`
+15. **CI/CD** — GitHub Actions workflow: lint, type-check, test, Docker build
+16. **Tool wrappers** — `tools.py` for cross-department escalation (Deep Agents ready)
 ---
 
 ## Future Roadmap
 
-- [ ] **LangGraph orchestration** — graph-based agent workflow with conditional routing
+- [x] **LangGraph orchestration** — graph-based agent workflow with conditional routing
+- [x] **Persistent memory** — SQLite checkpointer for cross-session conversation history
+- [x] **CI/CD** — GitHub Actions for testing and linting
+- [x] **Docker** — containerized deployment
+- [x] **API mode** — FastAPI endpoints alongside Streamlit
 - [ ] **Deep Agents** — multi-step planning, tool use, filesystem access
-- [ ] **Persistent memory** — cross-session memory with a database backend
-- [ ] **CI/CD** — GitHub Actions for testing and linting
-- [ ] **Docker** — containerized deployment
-- [ ] **API mode** — FastAPI endpoint alongside Streamlit
 - [ ] **Evaluation framework** — automated testing of agent response quality
+- [ ] **Authentication** — API key auth for FastAPI endpoints
+- [ ] **Rate limiting** — protect API from abuse
 
 ---
 
