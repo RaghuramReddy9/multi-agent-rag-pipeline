@@ -11,3 +11,16 @@ chroma_index/
 
 # Sensitive data
 .env
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

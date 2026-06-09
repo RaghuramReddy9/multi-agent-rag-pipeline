@@ -1,146 +1,235 @@
 # Multi-Agent RAG Pipeline
 
-### A Groq-powered multi-agent Retrieval-Augmented Generation system for intelligent customer support.
+**A production-grade, multi-agent Retrieval-Augmented Generation system for intelligent customer support.**
+
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![LangChain](https://img.shields.io/badge/LangChain-0.3+-green.svg)](https://www.langchain.com)
+[![OpenRouter](https://img.shields.io/badge/LLM-OpenRouter-blue.svg)](https://openrouter.ai)
+[![Streamlit](https://img.shields.io/badge/UI-Streamlit-red.svg)](https://streamlit.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
 ## Overview
 
-**Multi-Agent RAG Pipeline** is an advanced AI architecture where multiple specialized agents collaborate to solve domain-specific queries using **Retrieval-Augmented Generation (RAG)**.
+Multi-Agent RAG Pipeline is an AI customer support system where **specialized agents collaborate** to solve domain-specific queries using **Retrieval-Augmented Generation (RAG)**.
 
-The system uses **Groq's low-latency LPU models** for fast inference and **LangChain + Chroma** for document retrieval.  
-Each agent — **Billing**, **Technical**, and **General Support** — has its own RAG workflow and knowledge base, coordinated by a **Router Agent**.
+- **Router Agent** classifies incoming queries by department (Billing, Technical, General)
+- **Department Agents** each have their own knowledge base and RAG workflow
+- **Conversation memory** maintains context across turns within a session
+- **Structured logging** and **error handling** throughout
+
+Built with **OpenRouter** for flexible LLM access (supports Claude, GPT, LLaMA, and 100+ models), **LangChain 0.3+** for orchestration, **ChromaDB** for vector search, and **Streamlit** for the UI.
 
 ---
 
 ## Architecture
 
-```mermaid
-graph TD
-    A[User Query] --> B[Router Agent (Groq - LLaMA3 8B)]
-    B -->|Billing| C[Billing Agent - RAG over billing_faq.txt]
-    B -->|Technical| D[Tech Agent - RAG over tech_faq.txt]
-    B -->|General| E[General Agent - RAG over general_faq.txt]
-    C --> F[Groq Response]
-    D --> F
-    E --> F
-    F --> G[Streamlit UI Response]
+```
+┌─────────────┐
+│  User Query  │
+└──────┬──────┘
+       │
+       ▼
+┌──────────────────┐
+│  Router Agent     │  Groq LLM classifies query
+│  (Groq LLaMA 3.1)│  into billing / technical / general
+└──────┬───────────┘
+       │
+       ├──────────────┬──────────────┐
+       ▼              ▼              ▼
+┌────────────┐ ┌────────────┐ ┌────────────┐
+│  Billing   │ │  Technical │ │  General   │
+│  Agent     │ │  Agent     │ │  Agent     │
+│  RAG over  │ │  RAG over  │ │  RAG over  │
+│  billing   │ │  tech FAQ  │ │  general   │
+│  FAQ       │ │            │ │  FAQ       │
+└─────┬──────┘ └─────┬──────┘ └─────┬──────┘
+      │              │              │
+      └──────────────┼──────────────┘
+                     ▼
+            ┌────────────────┐
+            │  Streamlit UI  │
+            │  with session  │
+            │  memory        │
+            └────────────────┘
 ```
 
 ---
 
 ## Features
-- Groq-Powered Agents – blazing fast reasoning using `llama-3.1-8b-instant`
 
-- Billing / Tech / General Departments – each has its own context-aware knowledge base
-
-- RAG with ChromaDB – document retrieval + embedding search
-
-- Router Agent – auto-classifies user queries to the right department
-
-- Modular Design – ready for LangGraph or CrewAI orchestration
-
-- Streamlit Interface – interactive multi-agent chat with agent labels
+- **LLM-powered routing** — Groq classifies queries to the right department
+- **Department-specific RAG** — each agent has its own knowledge base
+- **Conversation memory** — context persists across turns in a session
+- **Error handling** — graceful fallbacks if LLM or vector store fails
+- **Structured logging** — timestamped, level-based logging throughout
+- **Centralized config** — Pydantic settings with `.env` support
+- **Current LangChain API** — uses `langchain-huggingface`, `langchain-chroma`, `langchain-core`
+- **Tested** — unit tests for router and agent error handling
 
 ---
 
 ## Tech Stack
 
-| Component        | Technology                               |
-| ---------------- | ---------------------------------------- |
-| **LLM Provider** | [Groq API](https://console.groq.com)     |
-| **Framework**    | [LangChain](https://www.langchain.com)   |
-| **Vector Store** | [ChromaDB](https://www.trychroma.com)    |
-| **Embeddings**   | `sentence-transformers/all-MiniLM-L6-v2` |
-| **Frontend**     | [Streamlit](https://streamlit.io)        |
-| **Environment**  | Python 3.10+                             |
-| **Architecture** | Modular Multi-Agent RAG                  |
+| Component        | Technology                                          |
+| ---------------- | --------------------------------------------------- |
+| **LLM Provider** | [OpenRouter](https://openrouter.ai) (100+ models: Claude, GPT, LLaMA, etc.) |
+| **Framework**    | [LangChain 0.3+](https://www.langchain.com)          |
+| **Vector Store** | [ChromaDB](https://www.trychroma.com)                |
+| **Embeddings**   | `sentence-transformers/all-MiniLM-L6-v2`             |
+| **Frontend**     | [Streamlit](https://streamlit.io)                    |
+| **Config**       | [Pydantic Settings](https://docs.pydantic.dev/)      |
+| **Testing**      | [pytest](https://docs.pytest.org/)                   |
+| **Environment**  | Python 3.10+                                         |
 
 ---
 
-## Folder Structure
+## Project Structure
 
+```
 multi-agent-rag-pipeline/
-├── app.py
-├── router.py
+├── app.py                    # Streamlit entry point
+├── router.py                 # Query classification agent
+├── config.py                 # Pydantic settings (loads from .env)
+├── logger.py                 # Structured logging setup
+├── requirements.txt          # Python dependencies
+├── .env.example              # Template for environment variables
+├── .gitignore
+├── LICENSE
+├── README.md
 ├── agents/
-│   ├── billing_agent.py
-│   ├── tech_agent.py
-│   └── general_agent.py
+│   ├── billing_agent.py      # Billing RAG agent
+│   ├── tech_agent.py         # Technical support RAG agent
+│   └── general_agent.py      # General inquiries RAG agent
 ├── utils/
-│   ├── groq_client.py
-│   ├── embeddings.py
-│   └── retriever.py
+│   ├── __init__.py
+│   └── vector_store.py       # Shared Chroma vector store builder
 ├── data/
-│   ├── billing_faq.txt
-│   ├── tech_faq.txt
-│   └── general_faq.txt
-├── requirements.txt
-├── .env.example
-└── README.md
+│   ├── billing_faq.txt       # Billing knowledge base
+│   ├── tech_faq.txt          # Technical support knowledge base
+│   └── general_faq.txt       # General inquiries knowledge base
+└── tests/
+    ├── __init__.py
+    ├── test_router.py        # Router classification tests
+    └── test_agents.py        # Agent error-handling tests
+```
 
 ---
 
 ## Installation & Setup
 
 ### 1. Clone the repo
+
 ```bash
 git clone https://github.com/RaghuramReddy9/multi-agent-rag-pipeline.git
 cd multi-agent-rag-pipeline
 ```
+
 ### 2. Create a virtual environment
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate     # or .venv\Scripts\activate on Windows
 ```
+
 ### 3. Install dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
-### 4. Set your environment variable
-Create a .env file:
-```ini
-GROQ_API_KEY=your_groq_api_key_here
+
+### 4. Configure environment
+
+```bash
+cp .env.example .env
+# Edit .env and add your OpenRouter API key
 ```
+
 ### 5. Run the app
+
 ```bash
 streamlit run app.py
 ```
 
-----
+### 6. Run tests
 
-## Example Queries
-| Query                             | Routed Agent |
-| --------------------------------- | ------------ |
-| “I want a refund for my payment.” | Billing      |
-| “My login page keeps crashing.”   | Technical    |
-| “What’s the HR contact email?”    | General      |
+```bash
+pytest tests/ -v
+```
 
 ---
 
-## Future Upgrades
+## Configuration
 
-This repo will evolve into a LangGraph-based orchestration pipeline in upcoming :
+All settings are managed in `config.py` via Pydantic Settings. Override any value in `.env`:
 
-- Graph-based node orchestration (`LangGraph`)
+| Variable              | Default                          | Description                    |
+| --------------------- | -------------------------------- | ------------------------------ |
+| `OPENROUTER_API_KEY`  | *(required)*                     | OpenRouter API key                 |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1`   | OpenRouter API base URL            |
+| `LLM_MODEL`           | `openrouter/auto`                | OpenRouter model (e.g., `openrouter/anthropic/claude-sonnet-4`) |
+| `LLM_TEMPERATURE`     | `0.2`                            | LLM temperature                |
+| `LLM_MAX_TOKENS`      | `512`                            | Max tokens per response        |
+| `EMBEDDING_MODEL`     | `sentence-transformers/all-MiniLM-L6-v2` | HuggingFace embedding model |
+| `CHUNK_SIZE`          | `800`                            | Document chunk size            |
+| `CHUNK_OVERLAP`       | `200`                            | Chunk overlap                  |
+| `RETRIEVAL_K`         | `3`                              | Number of docs to retrieve     |
+| `LOG_LEVEL`           | `INFO`                           | Logging level                  |
 
-- Parallel agent reasoning
+---
 
-- Persistent agent memory
+## Example Queries
 
-- Structured logs for fine-tuning
+| Query                                | Routed Agent |
+| ------------------------------------ | ------------ |
+| "I want a refund for my payment."    | Billing      |
+| "My login page keeps crashing."      | Technical    |
+| "What's the HR contact email?"       | General      |
+| "How do I cancel my subscription?"   | Billing      |
+| "The app is running slowly."         | Technical    |
 
-Stay tuned — this repo is designed as the foundation for enterprise-grade multi-agent AI pipelines.
+---
+
+## What Changed from v1 (Production Upgrade)
+
+This repo was upgraded from a demo to production-ready:
+
+1. **LangChain imports fixed** — uses current `langchain-huggingface`, `langchain-chroma`, `langchain-core` instead of deprecated `langchain_community.*` paths
+2. **Centralized config** — Pydantic Settings replaces hardcoded values scattered across files
+3. **Error handling** — every agent has try/catch with user-friendly fallback messages
+4. **Conversation memory** — session-level chat history passed to agents
+5. **Structured logging** — timestamped, level-based logging throughout
+6. **Shared vector store utility** — single `build_or_load_vectorstore()` function with caching
+7. **Tests** — pytest unit tests for router classification and agent error handling
+8. **`.env.example`** — documents all required and optional environment variables
+11. **LLM provider: Groq → OpenRouter** — all agents and router now use the OpenAI-compatible client pointed at OpenRouter. Supports 100+ models (Claude, GPT, LLaMA, etc.) with a single API key.
+10. **Updated README** — matches actual project structure and current architecture
+
+---
+
+## Future Roadmap
+
+- [ ] **LangGraph orchestration** — graph-based agent workflow with conditional routing
+- [ ] **Deep Agents** — multi-step planning, tool use, filesystem access
+- [ ] **Persistent memory** — cross-session memory with a database backend
+- [ ] **CI/CD** — GitHub Actions for testing and linting
+- [ ] **Docker** — containerized deployment
+- [ ] **API mode** — FastAPI endpoint alongside Streamlit
+- [ ] **Evaluation framework** — automated testing of agent response quality
 
 ---
 
 ## Author
 
-**RaghuramReddy Thirumalareddy**
+**Raghuramreddy Thirumalareddy**
 AI Engineer | Generative AI & RAG Systems
-https://github.com/RaghuramReddy9 | https://linkedin.com/in/raghuramreddy-ai
+
+- GitHub: https://github.com/RaghuramReddy9
+- LinkedIn: https://linkedin.com/in/raghuram-genai
 
 ---
 
 ## License
-MIT License © 2025 RaghuramReddy
+
+MIT License © 2025 Raghuramreddy Thirumalareddy
