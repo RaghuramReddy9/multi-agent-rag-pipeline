@@ -7,8 +7,6 @@ are centralized here instead of scattered across agent files.
 
 from __future__ import annotations
 
-import os
-
 from pydantic import Field
 from pydantic_settings import BaseSettings
 

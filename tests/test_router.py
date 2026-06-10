@@ -6,8 +6,6 @@ Uses lazy imports to avoid triggering config loading at module level.
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestRouterConstants:
     def test_departments_tuple(self):

@@ -16,7 +16,6 @@ import uuid
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from config import settings
